@@ -220,7 +220,7 @@ namespace sat
 
         void reset() noexcept
         {
-            for (int c = 0; c < 2; ++c) { env[c] = sag[c] = tapeEnv[c] = tapeRz[c] = xfPrev[c] = 0.0f; grainSeed[c] = 0x9E3779B9u + (uint32_t) c * 7919u; }
+            for (int c = 0; c < 2; ++c) { blend[c] = harmSmooth[c] = 0.0f; env[c] = sag[c] = tapeEnv[c] = tapeRz[c] = xfPrev[c] = 0.0f; grainSeed[c] = 0x9E3779B9u + (uint32_t) c * 7919u; }
             tubeWarm.reset(); tubeLp.reset();
             tapePre.reset(); tapePost.reset(); tapeBump.reset(); grainHp.reset();
             trMid.reset(); trTop.reset();
@@ -230,6 +230,15 @@ namespace sat
 
         void setType (int t) noexcept { type = std::clamp (t, 0, (int) NumTypes - 1); updateComp(); }
 
+        // Drive controls ALL the distortion. With drive off (or at 0 dB) the output is exactly the clean input.
+        //   - the saturation fades in over the first 6 dB of drive
+        //   - the harmonic generators fade in over the first 12 dB
+        void setDrive (float driveDb, bool driveOn) noexcept
+        {
+            blendTarget = driveOn ? std::clamp (driveDb / 6.0f,  0.0f, 1.0f) : 0.0f;
+            harmTarget  = driveOn ? std::clamp (driveDb / 12.0f, 0.0f, 1.0f) : 0.0f;
+        }
+
         // h: 0 = softest, 1 = hardest. Comes from the Softness control (turned the other way round).
         // It changes BOTH how sharp the knee of the curve is (p) and where clipping begins (g):
         //   soft  -> very rounded knee, clipping starts late (gentle, lots of headroom)
@@ -238,14 +247,20 @@ namespace sat
         void setHardness (float h) noexcept
         {
             h01   = std::clamp (h, 0.0f, 1.0f);
-            p     = 1.05f * std::pow (40.0f / 1.05f, h01);   // 1.05 .. 40
+            p     = 2.0f * std::pow (20.0f, h01);            // 2 .. 40 (never below 2: smooth near zero, so quiet signals stay clean)
             g     = 0.40f * std::pow (10.0f, h01);           // 0.4 .. 4.0
-            harmK = 0.8f + 1.4f * h01;                       // 0.8 .. 2.2
+            harmK = 0.6f + 0.9f * h01;                       // 0.6 .. 1.5 (times the drive amount)
             updateComp();
         }
 
         float process (float x, int ch) noexcept
         {
+            // smooth the drive amounts (about 5 ms) so switching Drive off / turning it never pops.
+            // Each channel has its own smoother, so left and right always behave identically.
+            blend[ch] += kAmountSmooth * (blendTarget - blend[ch]);
+            harm       = harmSmooth[ch] += kAmountSmooth * (harmTarget - harmSmooth[ch]);
+
+            const float dry = x;
             float y;
 
             switch (type)
@@ -261,14 +276,17 @@ namespace sat
 
             // Safety: very hot settings can push a style far above 0 dBFS. This is a gentle ceiling at about
             // +6 dBFS that leaves normal levels alone (only -0.35 dB at 0 dBFS) but tames extreme ones.
-            return 2.0f * softShape (y * 0.5f, 3.0f);
+            y = 2.0f * softShape (y * 0.5f, 3.0f);
+
+            // Drive off / at 0 dB: pass the clean input straight through, untouched
+            return dry + blend[ch] * (y - dry);
         }
 
         // Each style has a different natural loudness; this evens them out so switching tabs doesn't jump in level.
         static float trimDb (int t) noexcept
         {
             // measured on pink noise (-24 and -14 dBFS RMS, drive 12 dB, softness 50%)
-            static constexpr float kTrim[NumTypes] = { +0.4f, +3.0f, -0.3f, -3.0f };
+            static constexpr float kTrim[NumTypes] = { +1.3f, +1.9f, -1.0f, -2.2f };
             return kTrim[std::clamp (t, 0, (int) NumTypes - 1)];
         }
 
@@ -276,10 +294,10 @@ namespace sat
         // Level compensation across the Softness range: dB offsets at softness (hardness) 0, 25, 50, 75, 100 %.
         // Filled in from the offline measurement (see the test tools), 0 dB at the middle setting.
         static constexpr float kSoftComp[NumTypes][5] = {
-            { +1.1f, +1.0f, +0.0f, -0.1f, -0.5f },   // Tube
-            { -4.1f, -2.6f, +0.0f, +3.9f, +6.0f },   // Tape
-            { -2.9f, -2.2f, +0.0f, +3.3f, +4.1f },   // Transistor
-            { +2.8f, +2.2f, +0.0f, +0.5f, +3.4f },   // Transformer
+            { -1.2f, -0.6f, +0.0f, +1.4f, +4.9f },   // Tube
+            { -3.3f, -2.1f, +0.0f, +3.6f, +8.5f },   // Tape
+            { -2.8f, -2.1f, +0.0f, +4.1f, +7.0f },   // Transistor
+            { -0.5f, -0.1f, +0.0f, +1.3f, +4.4f },   // Transformer
         };
 
         void updateComp() noexcept
@@ -318,13 +336,13 @@ namespace sat
 
             x /= 1.0f + kTubeSag * std::min (s, 2.0f);
 
-            const float pPos = std::max (1.05f, p * 0.5f);     // gentler than a transistor's curve
-            const float bias = 0.02f + 0.42f * std::min (e, 1.5f);
+            const float pPos = std::max (2.0f, p * 0.5f);      // gentler than a transistor's curve
+            const float bias = 0.02f + 0.28f * std::min (e, 1.5f);
             const float xb   = x + bias;
 
-            float y = (xb >= 0.0f ? knee (xb, pPos) : knee (xb, 1.0f)) - knee (bias, pPos);
+            float y = (xb >= 0.0f ? knee (xb, pPos) : knee (xb, 2.0f)) - knee (bias, pPos);
 
-            y += harmK * exTube.process (x, ch, 0.17f, 0.040f, 0.045f, 0.0f, 0.0f);
+            y += harmK * harm * exTube.process (x, ch, -0.02f, 0.025f, 0.030f, 0.0f, 0.0f);
 
             return tubeLp.lp (ch, tubeWarm.process (ch, y));
         }
@@ -356,13 +374,13 @@ namespace sat
                 y += w * (knee (xs + kWarmth, pk) - knee (kWarmth, pk) - y);
             }
 
-            y += harmK * exTape.process (xin, ch, 0.025f, 0.120f, 0.0f, 0.040f, 0.0f);
+            y += harmK * harm * exTape.process (xin, ch, 0.015f, 0.090f, 0.0f, 0.025f, 0.0f);
 
             const float lo2 = tapePost.lp (ch, y);
             y = lo2 + (y - lo2) / kTapeHfDrive;
 
             // grain: noise scaled by how loud the signal is right now
-            y += kGrain * std::min (e, 1.5f) * grain (ch);
+            y += kGrain * harm * std::min (e, 1.5f) * grain (ch);
 
             // louder -> duller: the roll-off moves from 12 kHz down toward 2.5 kHz
             const float a = tapeAHi + (tapeALo - tapeAHi) * std::min (e * 1.2f, 1.0f);
@@ -377,11 +395,11 @@ namespace sat
         float transistor (float x, int ch) noexcept
         {
             const float xf = trTop.process (ch, trMid.process (ch, x));
-            const float pp = std::clamp (p * 1.5f, 2.0f, 60.0f);
+            const float pp = std::clamp (p * 1.5f, 3.0f, 60.0f);
             constexpr float b = 0.05f;
 
             float y = knee (xf + b, pp) - knee (b, pp);
-            y += harmK * exTr.process (xf, ch, 0.020f, 0.150f, 0.0f, 0.065f, 0.035f);
+            y += harmK * harm * exTr.process (xf, ch, 0.012f, 0.140f, 0.0f, 0.030f, 0.015f);
             return y;
         }
 
@@ -396,10 +414,10 @@ namespace sat
 
             // Low end saturates with a lopsided flux curve -> strong 2nd harmonic
             constexpr float kFluxBias = 0.35f;
-            const float pF = std::max (1.05f, p * 0.4f);
+            const float pF = std::max (2.0f, p * 0.4f);
             const float kF = 4.0f * g;
             const float lfSat = (softShape (lf * kF + kFluxBias, pF) - softShape (kFluxBias, pF)) / kF
-                              + harmK * exXf.process (lf, ch, 0.24f, 0.070f, 0.040f, 0.0f, 0.0f);
+                              + harm * harmK * exXf.process (lf, ch, 0.17f, 0.045f, 0.025f, 0.0f, 0.0f);
 
             const float y = xfWeight.process (ch, hf + lfSat);
 
@@ -407,7 +425,7 @@ namespace sat
             // The final stage sees a reduced level so mids and highs stay cleaner than the lows.
             const float memory = xfMem.lp (ch, xfPrev[ch]);
             const float bias   = 0.16f - 0.20f * memory;
-            const float pT     = std::max (1.05f, p * 0.35f);
+            const float pT     = std::max (2.0f, p * 0.35f);
             const float kFinal = 0.25f + 0.45f * h01;          // soft: mids stay clean; hard: the whole signal grits up
             const float gk     = g * kFinal;
 
@@ -421,10 +439,13 @@ namespace sat
         static constexpr float kTapeHfDrive = 1.5f;
         static constexpr float kTubeSag     = 0.5f;
         static constexpr float kGrain       = 0.10f;
+        static constexpr float kAmountSmooth = 0.002f;   // ~5 ms at the oversampled rate (rough, fine for a control smoother)
 
         double fs = 192000.0;
         int    type = Tube;
         float  h01 = 0.5f, p = 4.0f, g = 1.05f, harmK = 1.0f, softComp = 1.0f;
+        float  blend[2] {}, harmSmooth[2] {}, blendTarget = 0.0f, harmTarget = 0.0f;
+        float  harm = 0.0f;                               // the current channel's harmonic amount (used by the styles)
 
         // Tube
         float env[2] {}, sag[2] {};

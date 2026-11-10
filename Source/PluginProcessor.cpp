@@ -230,6 +230,9 @@ void SaturatorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     engine.setType (type);
     engine.setHardness (softnessOn ? 1.0f - param ("softness") : 0.5f);
 
+    // Drive decides how much distortion there is at all: with Drive OFF or at 0 dB the sound is left clean
+    engine.setDrive (param ("drive"), driveOn);
+
     // Low / High: emphasis in dB (0..+12), eased toward the target so turning the knob doesn't click
     const float targetLow  = lowOn ? param ("low") * 12.0f : 0.0f;
     const float targetHigh = (highOn ? param ("high") * 12.0f : 0.0f);
