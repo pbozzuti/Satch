@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Saturator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- The whole design lives on a fixed 1035 x 693 "stage" that app.js scales to fit the window. -->
+<div class="stage" id="stage">
+
+  <!-- ============================ HOME (stacked folders) ============================ -->
+  <section class="view" id="view-home">
+    <div class="band" data-go="tube"        style="--c:var(--tube);        --top:94px;  --h:77px">
+      <span class="btab" style="left:63px">TUBE</span>
+    </div>
+    <div class="band" data-go="tape"        style="--c:var(--tape);        --top:171px; --h:75px">
+      <span class="btab" style="left:636px">TAPE</span>
+    </div>
+    <div class="band" data-go="transistor"  style="--c:var(--transistor);  --top:246px; --h:102px">
+      <span class="btab" style="left:234px">TRANSISTOR</span>
+    </div>
+    <div class="band" data-go="transformer" style="--c:var(--transformer); --top:348px; --h:128px">
+      <span class="btab" style="left:773px">TRANSFORMER</span>
+    </div>
+    <div class="band credits-band" data-go="credits" style="--c:var(--credits); --top:476px; --h:190px">
+      <span class="btab" style="left:443px">CREDITS</span>
+      <p class="credit-text">Paris Bozzuti<br>2026</p>
+    </div>
+  </section>
+
+  <!-- ============================ SATURATION TYPES (tabs + controls) ============================ -->
+  <section class="view" id="view-panel" hidden>
+    <div class="backzone" data-go="home" title="Back to start"></div>
+
+    <nav class="tabs">
+      <button class="tab" data-go="tube"        style="--c:var(--tube);        left:110px">TUBE</button>
+      <button class="tab" data-go="tape"        style="--c:var(--tape);        left:296px">TAPE</button>
+      <button class="tab" data-go="transistor"  style="--c:var(--transistor);  left:481px">TRANSISTOR</button>
+      <button class="tab" data-go="transformer" style="--c:var(--transformer); left:673px">TRANSFORMER</button>
+    </nav>
+
+    <div class="panel">
+
+      <!-- top bar: overall mix + output level -->
+      <div class="bar">
+        <span class="label">MIX OUT</span>
+        <div class="value" data-param="mix" tabindex="0" role="slider" aria-label="Mix out"></div>
+        <span></span>
+        <span class="label">LVL OUT</span>
+        <div class="value" data-param="output" tabindex="0" role="slider" aria-label="Level out"></div>
+      </div>
+
+      <div class="bottom">
+
+        <!-- left: the four shaping controls, each with an on/off switch -->
+        <div class="left">
+          <div class="row">
+            <span class="label">DRIVE</span>
+            <div class="value" data-param="drive" tabindex="0" role="slider" aria-label="Drive"></div>
+            <button class="toggle on" data-toggle="drive" aria-pressed="true" aria-label="Drive on/off"><span class="knob">ON</span></button>
+          </div>
+          <div class="row">
+            <span class="label">LOW</span>
+            <div class="value" data-param="low" tabindex="0" role="slider" aria-label="Low"></div>
+            <button class="toggle on" data-toggle="low" aria-pressed="true" aria-label="Low on/off"><span class="knob">ON</span></button>
+          </div>
+          <div class="row">
+            <span class="label">HIGH</span>
+            <div class="value" data-param="high" tabindex="0" role="slider" aria-label="High"></div>
+            <button class="toggle on" data-toggle="high" aria-pressed="true" aria-label="High on/off"><span class="knob">ON</span></button>
+          </div>
+          <div class="row">
+            <span class="label">SOFTNESS</span>
+            <div class="value" data-param="softness" tabindex="0" role="slider" aria-label="Softness"></div>
+            <button class="toggle on" data-toggle="softness" aria-pressed="true" aria-label="Softness on/off"><span class="knob">ON</span></button>
+          </div>
+        </div>
+
+        <!-- right: chaos -->
+        <div class="right">
+          <h2>CHAOS</h2>
+          <svg class="scribble" id="scribble" viewBox="0 0 426 396" aria-hidden="true">
+            <defs>
+              <filter id="rough" x="-5%" y="-10%" width="110%" height="120%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="3" result="noise"/>
+                <feDisplacementMap id="disp" in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+              </filter>
+            </defs>
+            <g transform="rotate(-2 213 198)">
+              <g id="strokes" filter="url(#rough)" fill="none" stroke="#1c2340" stroke-linecap="round" stroke-linejoin="round"></g>
+            </g>
+          </svg>
+          <input class="chaos" id="chaos" data-param="chaos" type="range" min="0" max="1000" value="180" aria-label="Chaos">
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ CREDITS ============================ -->
+  <section class="view" id="view-credits" hidden>
+    <div class="backzone" data-go="home" title="Back to start"></div>
+    <nav class="tabs">
+      <button class="tab active" style="--c:var(--credits); left:110px">CREDITS</button>
+    </nav>
+    <div class="panel credits-panel">
+      <p class="credit-text">Paris Bozzuti<br>2026</p>
+    </div>
+  </section>
+
+  <!-- paper grain laid over everything (see .grain in style.css) -->
+  <div class="grain" aria-hidden="true"></div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

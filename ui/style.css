@@ -1,0 +1,295 @@
+/* ==========================================================================
+   Saturator UI
+   Designed on a fixed 1035 x 693 stage (see .stage). app.js scales the
+   stage to fit whatever size the plugin window is.
+   ========================================================================== */
+
+:root {
+  /* colours sampled from the mockup */
+  --paper:       #d1cac5;
+  --tube:        #b2bacf;
+  --tape:        #d1c0af;
+  --transistor:  #c28f8d;
+  --transformer: #cf9964;
+  --credits:     #584b3d;
+  --gray:        #d9d9d9;
+  --ink:         #1e1e1e;
+
+  /* Swap in your own font here (drop the file in ui/ and add an @font-face). */
+  --font: "Space Mono", "DM Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--ink);          /* shows only if the window ratio differs from the stage */
+  overflow: hidden;
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; }
+
+/* ---------- stage ---------- */
+.stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1035px;
+  height: 693px;
+  transform-origin: 0 0;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.view { position: absolute; inset: 0; }
+.view[hidden] { display: none; }
+
+/* click zone along the top edge: takes you back to the start screen */
+.backzone {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 56px;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   HOME: stacked folders
+   ========================================================================== */
+.band {
+  position: absolute;
+  left: 33px;
+  width: 969px;
+  top: var(--top);
+  height: var(--h);
+  background: var(--c);
+  cursor: pointer;
+}
+
+.btab {
+  position: absolute;
+  top: -30px;
+  width: 171px;
+  height: 30px;
+  border-radius: 10px 10px 0 0;
+  background: var(--c);
+  color: #fff;
+  font-size: 22px;
+  line-height: 30px;
+  text-align: center;
+  letter-spacing: 0.02em;
+  transition: top .12s ease, height .12s ease;
+}
+
+.band:hover .btab { top: -36px; height: 36px; line-height: 32px; }
+
+.credit-text {
+  position: absolute;
+  left: 24px;
+  bottom: 20px;
+  color: #fff;
+  font-size: 22px;
+  line-height: 32px;
+}
+
+/* ==========================================================================
+   TABS + PANEL
+   ========================================================================== */
+.tab {
+  position: absolute;
+  top: 67px;
+  width: 165px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px 10px 0 0;
+  background: var(--c);
+  color: #fff;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: height .12s ease, top .12s ease;
+}
+.tab:hover { top: 63px; height: 36px; }
+.tab.active { top: 67px; height: 34px; z-index: 2; cursor: default; }
+
+.panel {
+  position: absolute;
+  left: 48px;
+  top: 99px;
+  width: 939px;
+  height: 569px;
+  padding: 36px 61px 35px;
+  background: var(--accent, var(--tube));
+  display: grid;
+  grid-template-rows: 76px 1fr;
+  row-gap: 26px;
+  transition: background .2s ease;
+}
+
+.credits-panel { display: block; background: var(--credits); }
+
+/* ---------- top bar ---------- */
+.bar {
+  background: var(--gray);
+  border-radius: 38px;
+  padding: 0 32px 0 35px;
+  display: grid;
+  grid-template-columns: 190px 63px 1fr 266px 63px;
+  align-items: center;
+}
+
+.label {
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ---------- bottom row ---------- */
+.bottom {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  column-gap: 31px;
+  min-height: 0;
+}
+
+.left {
+  background: var(--gray);
+  border-radius: 36px;
+  padding: 0 35px 0 18px;
+  display: grid;
+  grid-template-rows: repeat(4, 1fr);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 122px 63px 1fr 70px;
+  align-items: center;
+}
+
+/* ---------- value circles (drag up/down) ---------- */
+.value {
+  width: 63px;
+  height: 63px;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+  transition: background .12s ease, opacity .15s ease;
+}
+.value.small { font-size: 17px; }
+.value:hover, .value:focus-visible { background: rgba(255, 255, 255, .45); }
+.value.dragging { border-width: 3px; background: rgba(255, 255, 255, .6); }
+
+.row.off .value { opacity: .35; }
+.row.off .label { opacity: .5; }
+
+/* ---------- on/off switch ---------- */
+.toggle {
+  grid-column: 4;
+  position: relative;
+  width: 70px;
+  height: 32px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--paper);
+  cursor: pointer;
+}
+.toggle .knob {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+  transition: right .15s ease, left .15s ease, background .15s ease;
+}
+.toggle:not(.on) .knob { right: auto; left: 2px; background: #777; font-size: 10px; }
+
+/* ---------- chaos ---------- */
+.right {
+  position: relative;
+  background: var(--gray);
+  border-radius: 36px;
+  overflow: hidden;              /* the scribble is clipped to the card's rounded corners */
+}
+.right h2 {
+  position: absolute;
+  z-index: 2;                    /* title stays above the scribble */
+  top: 18px;
+  width: 100%;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+.scribble {
+  position: absolute;            /* covers the whole CHAOS card */
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.chaos {
+  z-index: 2;                    /* slider stays above the scribble */
+  position: absolute;
+  left: 42px;
+  top: 338px;
+  width: 338px;
+  height: 32px;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+.chaos::-webkit-slider-runnable-track { height: 2px; background: var(--ink); }
+.chaos::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px; height: 32px;
+  margin-top: -15px;
+  border-radius: 5px;
+  background: var(--ink);
+}
+.chaos::-moz-range-track { height: 2px; background: var(--ink); }
+.chaos::-moz-range-thumb {
+  width: 10px; height: 32px;
+  border: 0; border-radius: 5px;
+  background: var(--ink);
+}
+
+/* ==========================================================================
+   PAPER GRAIN: a noise texture laid over the whole UI.
+   Two layers: fine speckle + soft blotchy unevenness. Clicks pass through it.
+   Tweak the look with --grain-strength (0 = off, 1 = full) below.
+   ========================================================================== */
+.stage { --grain-strength: 0.4; }
+
+.grain {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  opacity: var(--grain-strength);
+  background-size: 256px 256px, 640px 640px;
+  background-image:
+    /* fine paper speckle */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='f' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.3  0 0 0 0 0.25  1.3 0 0 0 -0.52'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>"),
+    /* soft, uneven blotches like paper fibre */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='f' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='0.012 0.02' numOctaves='3' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.45  0 0 0 0 0.4  0 0 0 0.45 -0.1'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>");
+}
